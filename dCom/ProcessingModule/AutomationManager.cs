@@ -9,335 +9,163 @@ namespace ProcessingModule
     /// Class containing logic for automated work.
     /// </summary>
     public class AutomationManager : IAutomationManager, IDisposable
-	{
-		private Thread automationWorker;
+    {
+        private Thread automationWorker;
         private AutoResetEvent automationTrigger;
         private IStorage storage;
-		private IProcessingManager processingManager;
-		private int delayBetweenCommands;
+        private IProcessingManager processingManager;
+        private int delayBetweenCommands;
         private IConfiguration configuration;
+        private bool stopRequested = false;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="AutomationManager"/> class.
-        /// </summary>
-        /// <param name="storage">The storage.</param>
-        /// <param name="processingManager">The processing manager.</param>
-        /// <param name="automationTrigger">The automation trigger.</param>
-        /// <param name="configuration">The configuration.</param>
         public AutomationManager(IStorage storage, IProcessingManager processingManager, AutoResetEvent automationTrigger, IConfiguration configuration)
-		{
-			this.storage = storage;
-			this.processingManager = processingManager;
+        {
+            this.storage = storage;
+            this.processingManager = processingManager;
             this.configuration = configuration;
             this.automationTrigger = automationTrigger;
         }
 
-        /// <summary>
-        /// Initializes and starts the threads.
-        /// </summary>
-		private void InitializeAndStartThreads()
-		{
-			InitializeAutomationWorkerThread();
-			StartAutomationWorkerThread();
-		}
+        private void InitializeAndStartThreads()
+        {
+            InitializeAutomationWorkerThread();
+            StartAutomationWorkerThread();
+        }
 
-        /// <summary>
-        /// Initializes the automation worker thread.
-        /// </summary>
-		private void InitializeAutomationWorkerThread()
-		{
-			automationWorker = new Thread(AutomationWorker_DoWork);
-			automationWorker.Name = "Aumation Thread";
-		}
+        private void InitializeAutomationWorkerThread()
+        {
+            automationWorker = new Thread(AutomationWorker_DoWork);
+            automationWorker.Name = "Automation Thread";
+        }
 
-        /// <summary>
-        /// Starts the automation worker thread.
-        /// </summary>
-		private void StartAutomationWorkerThread()
-		{
-			automationWorker.Start();
-		}
+        private void StartAutomationWorkerThread()
+        {
+            automationWorker.Start();
+        }
 
+        private void AutomationWorker_DoWork()
+        {
+            EGUConverter eguConverter = new EGUConverter();
+            PointIdentifier pidBaterija = new PointIdentifier(PointType.ANALOG_OUTPUT, 2000); //stavljeno na pocetak jer je lakse za pracenje
+            PointIdentifier pidT1 = new PointIdentifier(PointType.DIGITAL_OUTPUT, 1000);
+            PointIdentifier pidT2 = new PointIdentifier(PointType.DIGITAL_OUTPUT, 1001);
+            PointIdentifier pidT3 = new PointIdentifier(PointType.DIGITAL_OUTPUT, 1002);
+            PointIdentifier pidT4 = new PointIdentifier(PointType.DIGITAL_OUTPUT, 1003);
+            PointIdentifier pidI1 = new PointIdentifier(PointType.DIGITAL_OUTPUT, 3000);
+            PointIdentifier pidI2 = new PointIdentifier(PointType.DIGITAL_OUTPUT, 3001);
 
-		private void AutomationWorker_DoWork()
-		{
-			EGUConverter eguConverter = new EGUConverter();
-			PointIdentifier KapacitetBaterije = new PointIdentifier(PointType.ANALOG_OUTPUT, 2000); //stavili na pocetak jer je lakse za pracenje
-			PointIdentifier USB1 = new PointIdentifier(PointType.DIGITAL_OUTPUT, 1000);
-			PointIdentifier USB2 = new PointIdentifier(PointType.DIGITAL_OUTPUT, 1001);
-			PointIdentifier USB3 = new PointIdentifier(PointType.DIGITAL_OUTPUT, 1002);
-			PointIdentifier Uticnica = new PointIdentifier(PointType.DIGITAL_OUTPUT, 1003);
-			PointIdentifier Napajanje1 = new PointIdentifier(PointType.DIGITAL_OUTPUT, 3000);
-			PointIdentifier Napajanje2 = new PointIdentifier(PointType.DIGITAL_OUTPUT, 3001);
+            List<PointIdentifier> all = new List<PointIdentifier> { pidBaterija, pidT1, pidT2, pidT3, pidT4, pidI1, pidI2 };
 
-            List<PointIdentifier> signali = new List<PointIdentifier> { KapacitetBaterije, USB1, USB2, USB3, Uticnica, Napajanje1, Napajanje2 };
-            ushort tempCap = 0;
+            while (!stopRequested)
             {
-                List<IPoint> tacke = storage.GetPoints(signali);
-                IConfigItem configElement = tacke[0].ConfigItem;
+                automationTrigger.WaitOne();
+                var pts = storage.GetPoints(all);
+                if (pts.Count != 7) continue;
 
-				ushort kapacitet = (ushort)eguConverter.ConvertToEGU(configElement.ScaleFactor, configElement.Deviation, tacke[0].RawValue);
+                //lakse je da sve podelimo na varijable nego da svaki put pristupamo listi
+                var baterija = pts[0] as IAnalogPoint; // raw podaci, mi koristimo EGU vrednost
+                var usb1 = pts[1] as IDigitalPoint; // T1
+                var usb2 = pts[2] as IDigitalPoint; // T2
+                var usb3 = pts[3] as IDigitalPoint; // T3
+                var uticnica = pts[4] as IDigitalPoint; // T4
+                var napajanje1 = pts[5] as IDigitalPoint; // I1
+                var napajanje2 = pts[6] as IDigitalPoint; // I2
 
-                //logika-------------------------------------------------------------
+                if (baterija == null) continue;
+                IConfigItem cfg = baterija.ConfigItem;
 
+                double capEGU = baterija.EguValue; //koristimo EGU vrednost za kapacitet baterije
+                double praznjenje = 0;
+                if (usb1.State == DState.ON) praznjenje += 1; //moglo je i preko raw value ali je ovako lepse
+                if (usb2.State == DState.ON) praznjenje += 1;
+                if (usb3.State == DState.ON) praznjenje += 1;
+                if (uticnica.State == DState.ON) praznjenje += 3;
 
-                //1. uticnica-----------------------------------------------------
+                double punjenje = 0;
+                if (napajanje1.State == DState.ON) punjenje += 2;
+                if (napajanje2.State == DState.ON) punjenje += 3;
 
-                if (tacke[1].RawValue == 1) //ako je povezana 1. uticnica
-				{
-					if ((tempCap -= 1) >= 0) //ako moze da se smanji za 1 posto, smanji ga
-					{
-						kapacitet -= 1;
-						if (kapacitet == configElement.MinValue) //isto kao == 0
-						{
-							tempCap = 0;
-							processingManager.ExecuteWriteCommand(tacke[1].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, USB1.Address, 0); //gasimo 1. uticnicu
-							automationTrigger.WaitOne();
-						}
-						else
-						{
-							processingManager.ExecuteWriteCommand(configElement, configuration.GetTransactionId(), configuration.UnitAddress, KapacitetBaterije.Address, kapacitet);
-						}
-					}
-                    else //ako ne moze da se smanji, gasimo uticnicu
-					{
-						tempCap = 0;
-						processingManager.ExecuteWriteCommand(tacke[1].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, USB1.Address, 0); //gasimo 1. uticnicu
-						automationTrigger.WaitOne();
-                    }
-                }
-
-
-                //2. uticnica-----------------------------------------------------
-
-                if (tacke[2].RawValue == 1) //ako je povezana 2. uticnica
+                // Racunamo da ne mogu oba napajanja da budu upaljena istovremeno
+                // Ako jesu, gasimo slabije (I1)
+                if (napajanje1.State == DState.ON && napajanje2.State == DState.ON)
                 {
-					if((tempCap-=1) >= 0) //ako moze da se smanji za 1 posto, smanji ga
-					{
-						kapacitet-=1;
-						if (kapacitet ==configElement.MinValue) //isto kao ==0
-						{
-                            tempCap = 0;
-                            processingManager.ExecuteWriteCommand(tacke[2].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, USB2.Address, 0); //gasimo 2. uticnicu
-                            automationTrigger.WaitOne();
-                        }
-						else
-						{
-							processingManager.ExecuteWriteCommand(configElement, configuration.GetTransactionId(), configuration.UnitAddress, KapacitetBaterije.Address,kapacitet);
-						}
-                    }
-                    else //ako ne moze da se smanji, gasimo uticnicu
-					{
-						tempCap = 0;
-						processingManager.ExecuteWriteCommand(tacke[2].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, USB2.Address, 0); //gasimo 2. uticnicu
-						automationTrigger.WaitOne();
-                    }
+                    processingManager.ExecuteWriteCommand(napajanje1.ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, pidI1.Address, 0);
                 }
 
+                // primenjujemo punjenje i praznjenje na kapacitet baterije
+                capEGU += punjenje;
+                capEGU -= praznjenje;
 
-
-                //3. uticnica-----------------------------------------------------
-
-                if (tacke[3].RawValue == 1) //ako je povezana 3. uticnica
-				{
-					if((tempCap-=1) >= 0) //ako moze da se smanji za 1 posto, smanji ga
-					{
-						kapacitet-=1;
-						if (kapacitet ==configElement.MinValue) //isto kao ==0
-						{
-                            tempCap = 0;
-                            processingManager.ExecuteWriteCommand(tacke[3].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, USB3.Address, 0); //gasimo 1. uticnicu
-                            automationTrigger.WaitOne();
-                        }
-						else
-						{
-							processingManager.ExecuteWriteCommand(configElement, configuration.GetTransactionId(), configuration.UnitAddress, KapacitetBaterije.Address,kapacitet);
-						}
-                    }
-					else //ako ne moze da se smanji, gasimo uticnicu
-					{
-						tempCap = 0;
-						processingManager.ExecuteWriteCommand(tacke[3].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, USB3.Address, 0); //gasimo 3. uticnicu
-						automationTrigger.WaitOne();
-					}
-                }
-
-                //4. uticinica-----------------------------------------------------
-
-				if (tacke[4].RawValue == 1) //ako je povezana uticnica
-				{
-                    if ((tempCap -= 3) >= 0) //ako moze da se smanji za 1 posto, smanji ga
-                    {
-                        kapacitet -= 3;
-                        if (kapacitet == configElement.MinValue) //isto kao ==0
-                        {
-                            tempCap = 0;
-                            processingManager.ExecuteWriteCommand(tacke[4].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, Uticnica.Address, 0); //gasimo I4 uticnicu
-                            automationTrigger.WaitOne();
-                            //palimo napajanje I2
-                            processingManager.ExecuteWriteCommand(tacke[6].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, Napajanje2.Address, 1);
-                        }
-                        else
-                        {
-                            processingManager.ExecuteWriteCommand(configElement, configuration.GetTransactionId(), configuration.UnitAddress, KapacitetBaterije.Address, kapacitet);
-                        }
-                    }
-                    else //ako ne moze da se smanji, gasimo uticnicu
-                    {
-                        tempCap = 0;
-                        processingManager.ExecuteWriteCommand(tacke[4].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, Uticnica.Address, 0); //gasimo I4 uticnicu
-                        automationTrigger.WaitOne();
-                        //palimo napajanje I2
-                        processingManager.ExecuteWriteCommand(tacke[6].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, Napajanje2.Address, 1);
-
-                    }
-                }
-
-                //napajanje I2-----------------------------------------------------
-
-                if (tacke[6].RawValue == 1) //ako je ukljuceno napajanje I2
-				{
-					//da li dodati iskljucivanje I1
-					if ((tempCap += 3) <= 100)
-					{
-						kapacitet += 3;
-						if (kapacitet == configElement.MaxValue) //isto kao ==100
-						{
-							tempCap = 100;
-							processingManager.ExecuteWriteCommand(tacke[6].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, Napajanje2.Address, 0); //gasimo napajanje I2
-							automationTrigger.WaitOne();
-							processingManager.ExecuteWriteCommand(configElement, configuration.GetTransactionId(), configuration.UnitAddress, KapacitetBaterije.Address, kapacitet); //azuriramo kapacitet
-
-						}
-						else
-						{
-							processingManager.ExecuteWriteCommand(configElement, configuration.GetTransactionId(), configuration.UnitAddress, KapacitetBaterije.Address, kapacitet);
-						}
-					}
-					else //ako ne moze da se poveća, gasimo napajanje I2
-					{
-						tempCap = 100;
-						processingManager.ExecuteWriteCommand(tacke[6].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, Napajanje2.Address, 0); //gasimo napajanje I2
-					}
-				}
-
-
-                //napajanje I1-----------------------------------------------------
-
-                if (tacke[5].RawValue == 1) //ako je ukljuceno napajanje I2
+                // Low alarm: ako je vrednost ispod LowLimit, iskljuci uticnicu T4 i ukljuci jace napajanje I2
+                bool lowAlarm = capEGU < cfg.LowLimit;
+                if (lowAlarm)
                 {
-                    //da li dodati iskljucivanje I2, ako je I2 ukljucen
-                    if ((tempCap += 2) <= 100)
+                    if (uticnica.State == DState.ON)
                     {
-                        kapacitet +=2;
-                        if (kapacitet == configElement.MaxValue) //isto kao ==100
-                        {
-                            tempCap = 100;
-                            processingManager.ExecuteWriteCommand(tacke[5].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, Napajanje1.Address, 0); //gasimo napajanje I2
-                            automationTrigger.WaitOne();
-                            processingManager.ExecuteWriteCommand(configElement, configuration.GetTransactionId(), configuration.UnitAddress, KapacitetBaterije.Address, kapacitet); //azuriramo kapacitet
-
-                        }
-                        else
-                        {
-                            processingManager.ExecuteWriteCommand(configElement, configuration.GetTransactionId(), configuration.UnitAddress, KapacitetBaterije.Address, kapacitet);
-                        }
+                        processingManager.ExecuteWriteCommand(uticnica.ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, pidT4.Address, 0);
                     }
-                    else //ako ne moze da se poveća, gasimo napajanje I1
+                    if (napajanje2.State == DState.OFF)
                     {
-                        tempCap = 100;
-                        processingManager.ExecuteWriteCommand(tacke[5].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, Napajanje2.Address, 0); //gasimo napajanje I2
+                        processingManager.ExecuteWriteCommand(napajanje2.ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, pidI2.Address, 1);
                     }
                 }
 
-                //kapacitet pao ispod 20%
-                //ako je ukljucena uticnica T4, gasimo je i palimo napajanje I2
-                if (kapacitet < 20  && tacke[4].RawValue == 1)
-				{
-                    processingManager.ExecuteWriteCommand(tacke[5].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, Uticnica.Address, 0); //gasimo uticnicu T4
+                // Ako se desi da ode u minus, vratimo na minimum
+                if (capEGU < cfg.EGU_Min) capEGU = cfg.EGU_Min;
+                if (capEGU > cfg.EGU_Max) capEGU = cfg.EGU_Max;
+
+                // Kada se baterija napuni do maksimuma, iskljuci napajanje koje je ukljuceno
+                if (Math.Abs(capEGU - cfg.EGU_Max) < 0.0001)
+                {
+                    if (napajanje1.State == DState.ON)
+                        processingManager.ExecuteWriteCommand(napajanje1.ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, pidI1.Address, 0);
+                    if (napajanje2.State == DState.ON)
+                        processingManager.ExecuteWriteCommand(napajanje2.ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, pidI2.Address, 0);
+                }
+
+                // Pisemo nazad bateriji novi kapacitet
+                processingManager.ExecuteWriteCommand(cfg, configuration.GetTransactionId(), configuration.UnitAddress, pidBaterija.Address, (int)capEGU);
+
+                // Delay izmedju komandi (1 sekunda)
+                for (int ms = 0; ms < delayBetweenCommands; ms += 1000)
+                {
+                    if (stopRequested) break;
                     automationTrigger.WaitOne();
-					processingManager.ExecuteWriteCommand(tacke[6].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, Napajanje2.Address, 1); //palimo napajanje I2
                 }
-				else if( kapacitet<20)
-				{
-					if (tacke[6].RawValue == 0) //ako nije ukljuceno napajanje I2, palimo ga
-                        processingManager.ExecuteWriteCommand(tacke[6].ConfigItem, configuration.GetTransactionId(), configuration.UnitAddress, Napajanje2.Address, 1); //palimo napajanje I2
-                }
-                //---------------------------------------------------------------------
-
-                //rucno podesavanje-----------------------------------------------------
-                //Korisnik moze rucno da ukljuci uredjaje na t1-t4 akko je kapacitet veci od 20 (LowAlarm)
-                if (kapacitet>configElement.LowLimit) // >20
-				{
-					if (tacke[1].RawValue == 1) //ako je povezana 1. uticnica
-                    {
-						kapacitet -= 1;
-						processingManager.ExecuteWriteCommand(configElement, configuration.GetTransactionId(), configuration.UnitAddress, KapacitetBaterije.Address, kapacitet);
-                    }
-					
-					if(tacke[2].RawValue == 1) //ako je povezana 2. uticnica
-					{
-						kapacitet -= 1;
-						processingManager.ExecuteWriteCommand(configElement, configuration.GetTransactionId(), configuration.UnitAddress, KapacitetBaterije.Address, kapacitet);
-                    }
-
-					if(tacke[3].RawValue == 1) //ako je povezana 3. uticnica
-                    {
-						kapacitet -= 1;
-						processingManager.ExecuteWriteCommand(configElement, configuration.GetTransactionId(), configuration.UnitAddress, KapacitetBaterije.Address, kapacitet);
-                    }
-
-                    if(tacke[4].RawValue == 1) //ako je povezana T4 uticnica
-                    {
-						kapacitet -= 3;
-						processingManager.ExecuteWriteCommand(configElement, configuration.GetTransactionId(), configuration.UnitAddress, KapacitetBaterije.Address, kapacitet);
-                    }
-                }
-                for (int i = 0; i < delayBetweenCommands; i += 1000)
-                    automationTrigger.WaitOne();
             }
         }
 
-		#region IDisposable Support
-		private bool disposedValue = false; // To detect redundant calls
+        #region IDisposable Support
+        private bool disposedValue = false;
 
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    stopRequested = true;
+                }
+                disposedValue = true;
+            }
+        }
 
-        /// <summary>
-        /// Disposes the object.
-        /// </summary>
-        /// <param name="disposing">Indication if managed objects should be disposed.</param>
-		protected virtual void Dispose(bool disposing)
-		{
-			if (!disposedValue)
-			{
-				if (disposing)
-				{
-				}
-				disposedValue = true;
-			}
-		}
+        public void Dispose()
+        {
+            Dispose(true);
+        }
 
-
-		// This code added to correctly implement the disposable pattern.
-		public void Dispose()
-		{
-			// Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-			Dispose(true);
-			// GC.SuppressFinalize(this);
-		}
-
-        /// <inheritdoc />
         public void Start(int delayBetweenCommands)
-		{
-			this.delayBetweenCommands = delayBetweenCommands*1000;
+        {
+            this.delayBetweenCommands = delayBetweenCommands * 1000;
             InitializeAndStartThreads();
-		}
+        }
 
-        /// <inheritdoc />
         public void Stop()
-		{
-			Dispose();
-		}
-		#endregion
-	}
+        {
+            stopRequested = true;
+            Dispose();
+        }
+        #endregion
+    }
 }

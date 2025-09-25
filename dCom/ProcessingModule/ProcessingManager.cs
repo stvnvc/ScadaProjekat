@@ -7,9 +7,7 @@ using System.Linq;
 
 namespace ProcessingModule
 {
-    /// <summary>
-    /// Class containing logic for processing points and executing commands.
-    /// </summary>
+
     public class ProcessingManager : IProcessingManager
     {
         private IFunctionExecutor functionExecutor;
@@ -17,11 +15,6 @@ namespace ProcessingModule
         private AlarmProcessor alarmProcessor;
         private EGUConverter eguConverter;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ProcessingManager"/> class.
-        /// </summary>
-        /// <param name="storage">The point storage.</param>
-        /// <param name="functionExecutor">The function executor.</param>
         public ProcessingManager(IStorage storage, IFunctionExecutor functionExecutor)
         {
             this.storage = storage;
@@ -38,7 +31,7 @@ namespace ProcessingModule
             IModbusFunction fn = FunctionFactory.CreateModbusFunction(p);
             this.functionExecutor.EnqueueCommand(fn);
         }
-        
+
         /// <inheritdoc />
         public void ExecuteWriteCommand(IConfigItem configItem, ushort transactionId, byte remoteUnitAddress, ushort pointAddress, int value)
         {
@@ -52,14 +45,6 @@ namespace ProcessingModule
             }
         }
 
-        /// <summary>
-        /// Executes a digital write command.
-        /// </summary>
-        /// <param name="configItem">The configuration item.</param>
-        /// <param name="transactionId">The transaction identifier.</param>
-        /// <param name="remoteUnitAddress">The remote unit address.</param>
-        /// <param name="pointAddress">The point address.</param>
-        /// <param name="value">The value.</param>
         private void ExecuteDigitalCommand(IConfigItem configItem, ushort transactionId, byte remoteUnitAddress, ushort pointAddress, int value)
         {
             ModbusWriteCommandParameters p = new ModbusWriteCommandParameters(6, (byte)ModbusFunctionCode.WRITE_SINGLE_COIL, pointAddress, (ushort)value, transactionId, remoteUnitAddress);
@@ -67,26 +52,18 @@ namespace ProcessingModule
             this.functionExecutor.EnqueueCommand(fn);
         }
 
-        /// <summary>
-        /// Executes an analog write command.
-        /// </summary>
-        /// <param name="configItem">The configuration item.</param>
-        /// <param name="transactionId">The transaction identifier.</param>
-        /// <param name="remoteUnitAddress">The remote unit address.</param>
-        /// <param name="pointAddress">The point address.</param>
-        /// <param name="value">The value.</param>
-        private void ExecuteAnalogCommand(IConfigItem configItem, ushort transactionId, byte remoteUnitAddress, ushort pointAddress, int value)
+
+        private void ExecuteAnalogCommand(IConfigItem configItem, ushort transactionId, byte remoteUnitAddress, ushort pointAddress, int eguValue)
         {
-            ModbusWriteCommandParameters p = new ModbusWriteCommandParameters(6, (byte)ModbusFunctionCode.WRITE_SINGLE_REGISTER, pointAddress, (ushort)value, transactionId, remoteUnitAddress);
+            // Convert commanded EGU value to raw before sending.
+            ushort raw = eguConverter.ConvertToRaw(configItem.ScaleFactor, configItem.Deviation, eguValue);
+            if (raw < configItem.MinValue) raw = configItem.MinValue;
+            if (raw > configItem.MaxValue) raw = configItem.MaxValue;
+            ModbusWriteCommandParameters p = new ModbusWriteCommandParameters(6, (byte)ModbusFunctionCode.WRITE_SINGLE_REGISTER, pointAddress, raw, transactionId, remoteUnitAddress);
             IModbusFunction fn = FunctionFactory.CreateModbusFunction(p);
             this.functionExecutor.EnqueueCommand(fn);
         }
 
-        /// <summary>
-        /// Gets the modbus function code for the point type.
-        /// </summary>
-        /// <param name="registryType">The register type.</param>
-        /// <returns>The modbus function code.</returns>
         private ModbusFunctionCode? GetReadFunctionCode(PointType registryType)
         {
             switch (registryType)
@@ -100,16 +77,11 @@ namespace ProcessingModule
             }
         }
 
-        /// <summary>
-        /// Method for handling received points.
-        /// </summary>
-        /// <param name="type">The point type.</param>
-        /// <param name="pointAddress">The point address.</param>
-        /// <param name="newValue">The new value.</param>
+
         private void CommandExecutor_UpdatePointEvent(PointType type, ushort pointAddress, ushort newValue)
         {
             List<IPoint> points = storage.GetPoints(new List<PointIdentifier>(1) { new PointIdentifier(type, pointAddress) });
-            
+
             if (type == PointType.ANALOG_INPUT || type == PointType.ANALOG_OUTPUT)
             {
                 ProcessAnalogPoint(points.First() as IAnalogPoint, newValue);
@@ -120,11 +92,6 @@ namespace ProcessingModule
             }
         }
 
-        /// <summary>
-        /// Processes a digital point.
-        /// </summary>
-        /// <param name="point">The digital point</param>
-        /// <param name="newValue">The new value.</param>
         private void ProcessDigitalPoint(IDigitalPoint point, ushort newValue)
         {
             point.RawValue = newValue;
@@ -136,11 +103,6 @@ namespace ProcessingModule
 
         }
 
-        /// <summary>
-        /// Processes an analog point
-        /// </summary>
-        /// <param name="point">The analog point.</param>
-        /// <param name="newValue">The new value.</param>
         private void ProcessAnalogPoint(IAnalogPoint point, ushort newValue)
         {
             point.RawValue = newValue;

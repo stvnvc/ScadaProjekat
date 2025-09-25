@@ -34,235 +34,110 @@ namespace dCom.Configuration
 
         public PointType RegistryType
         {
-            get
-            {
-                return registryType;
-            }
-
-            set
-            {
-                registryType = value;
-            }
+            get { return registryType; }
+            set { registryType = value; }
         }
 
         public ushort NumberOfRegisters
         {
-            get
-            {
-                return numberOfRegisters;
-            }
-
-            set
-            {
-                numberOfRegisters = value;
-            }
+            get { return numberOfRegisters; }
+            set { numberOfRegisters = value; }
         }
 
         public ushort StartAddress
         {
-            get
-            {
-                return startAddress;
-            }
-
-            set
-            {
-                startAddress = value;
-            }
+            get { return startAddress; }
+            set { startAddress = value; }
         }
 
         public ushort DecimalSeparatorPlace
         {
-            get
-            {
-                return decimalSeparatorPlace;
-            }
-
-            set
-            {
-                decimalSeparatorPlace = value;
-            }
+            get { return decimalSeparatorPlace; }
+            set { decimalSeparatorPlace = value; }
         }
 
         public ushort MinValue
         {
-            get
-            {
-                return minValue;
-            }
-
-            set
-            {
-                minValue = value;
-            }
+            get { return minValue; }
+            set { minValue = value; }
         }
 
         public ushort MaxValue
         {
-            get
-            {
-                return maxValue;
-            }
-
-            set
-            {
-                maxValue = value;
-            }
+            get { return maxValue; }
+            set { maxValue = value; }
         }
 
         public ushort DefaultValue
         {
-            get
-            {
-                return defaultValue;
-            }
-
-            set
-            {
-                defaultValue = value;
-            }
+            get { return defaultValue; }
+            set { defaultValue = value; }
         }
 
         public string ProcessingType
         {
-            get
-            {
-                return processingType;
-            }
-
-            set
-            {
-                processingType = value;
-            }
+            get { return processingType; }
+            set { processingType = value; }
         }
 
         public string Description
         {
-            get
-            {
-                return description;
-            }
-
-            set
-            {
-                description = value;
-            }
+            get { return description; }
+            set { description = value; }
         }
 
         public int AcquisitionInterval
         {
-            get
-            {
-                return acquisitionInterval;
-            }
-
-            set
-            {
-                acquisitionInterval = value;
-            }
+            get { return acquisitionInterval; }
+            set { acquisitionInterval = value; }
         }
 
         public double ScaleFactor
         {
-            get
-            {
-                return scalingFactor;
-            }
-            set
-            {
-                scalingFactor = value;
-            }
+            get { return scalingFactor; }
+            set { scalingFactor = value; }
         }
 
         public double Deviation
         {
-            get
-            {
-                return deviation;
-            }
-
-            set
-            {
-                deviation = value;
-            }
+            get { return deviation; }
+            set { deviation = value; }
         }
 
         public double EGU_Max
         {
-            get
-            {
-                return egu_max;
-            }
-
-            set
-            {
-                egu_max = value;
-            }
+            get { return egu_max; }
+            set { egu_max = value; }
         }
 
         public double EGU_Min
         {
-            get
-            {
-                return egu_min;
-            }
-
-            set
-            {
-                egu_min = value;
-            }
+            get { return egu_min; }
+            set { egu_min = value; }
         }
 
         public ushort AbnormalValue
         {
-            get
-            {
-                return abnormalValue;
-            }
-
-            set
-            {
-                abnormalValue = value;
-            }
+            get { return abnormalValue; }
+            set { abnormalValue = value; }
         }
 
         public double HighLimit
         {
-            get
-            {
-                return highLimit;
-            }
-
-            set
-            {
-                highLimit = value;
-            }
+            get { return highLimit; }
+            set { highLimit = value; }
         }
 
         public double LowLimit
         {
-            get
-            {
-                return lowLimit;
-            }
-
-            set
-            {
-                lowLimit = value;
-            }
+            get { return lowLimit; }
+            set { lowLimit = value; }
         }
 
         public int SecondsPassedSinceLastPoll
         {
-            get
-            {
-                return secondsPassedSinceLastPoll;
-            }
-
-            set
-            {
-                secondsPassedSinceLastPoll = value;
-            }
+            get { return secondsPassedSinceLastPoll; }
+            set { secondsPassedSinceLastPoll = value; }
         }
 
         #endregion Properties
@@ -271,7 +146,6 @@ namespace dCom.Configuration
         {
             RegistryType = GetRegistryType(configurationParameters[0]);
             int temp;
-            double doubleTemp;
             Int32.TryParse(configurationParameters[1], out temp);
             NumberOfRegisters = (ushort)temp;
             Int32.TryParse(configurationParameters[2], out temp);
@@ -286,6 +160,8 @@ namespace dCom.Configuration
             DefaultValue = (ushort)temp;
             ProcessingType = configurationParameters[7];
             Description = configurationParameters[8].TrimStart('@');
+
+            // Acquisition interval = 1 sekunda
             if (configurationParameters[9].Equals("#"))
             {
                 AcquisitionInterval = 1;
@@ -295,7 +171,8 @@ namespace dCom.Configuration
                 Int32.TryParse(configurationParameters[9], out temp);
                 AcquisitionInterval = temp;
             }
-            //A – faktor skaliranja (celobrojna vrednost, podrazumevana vrednost treba da bude 1)
+
+            // A – faktor skaliranja (celobrojna vrednost, podrazumevana vrednost treba da bude 1)
             if (configurationParameters[10].Equals("#"))
             {
                 ScaleFactor = 1;
@@ -306,7 +183,7 @@ namespace dCom.Configuration
                 ScaleFactor = temp;
             }
 
-            //B – odstupanje (celobrojna vrednost, podrazumevana vrednost treba da bude 0)
+            // B – odstupanje (celobrojna vrednost, podrazumevana vrednost treba da bude 0)
             if (configurationParameters[11].Equals("#"))
             {
                 Deviation = 0;
@@ -317,7 +194,7 @@ namespace dCom.Configuration
                 Deviation = temp;
             }
 
-            //EguMax – Maksimalan kapacitet baterije (podrazumevana vrednost 100)
+            // EguMax (fizicki maksimum = 100)
             if (configurationParameters[12].Equals("#"))
             {
                 EGU_Max = 100;
@@ -328,10 +205,10 @@ namespace dCom.Configuration
                 EGU_Max = temp;
             }
 
-            //EguMin – Minimalni kapacitet baterije (podrazumevana vrednost 0)
+            // EguMin (fizicki minimum = 0)
             if (configurationParameters[13].Equals("#"))
             {
-                EGU_Min = 100;
+                EGU_Min = 0;
             }
             else
             {
@@ -339,20 +216,20 @@ namespace dCom.Configuration
                 EGU_Min = temp;
             }
 
-            //AbnormalValue – označava abnormalno stanje za digitalne veličine (podrazumevana vrednost treba dasuprotna od normalnog stanja).
-            if (configurationParameters[6].Equals(1))
+            // AbnormalValue (samo za digitalne registre)
+            if (RegistryType == PointType.DIGITAL_OUTPUT || RegistryType == PointType.DIGITAL_INPUT)
             {
-                AbnormalValue = 0;
+                AbnormalValue = (ushort)(DefaultValue == 0 ? 1 : 0);
             }
             else
             {
-                AbnormalValue = 1;
+                AbnormalValue = 0;
             }
 
-            //HighAlarm – Gornja granica alarma (podrazumevana vrednost 80)
+            // High limit (u ovom slucaju )
             if (configurationParameters[15].Equals("#"))
             {
-                HighLimit = 100;
+                HighLimit = 90; // ima smisla da bude 90 posto
             }
             else
             {
@@ -360,7 +237,7 @@ namespace dCom.Configuration
                 HighLimit = temp;
             }
 
-            //LowAlarm – Donja granica alarma (podrazumevana vrednost 20)
+            // Low limit (Dato u specifikaciji, a ima i smisla)
             if (configurationParameters[16].Equals("#"))
             {
                 LowLimit = 20;
@@ -380,19 +257,15 @@ namespace dCom.Configuration
                 case "DO_REG":
                     registryType = PointType.DIGITAL_OUTPUT;
                     break;
-
                 case "DI_REG":
                     registryType = PointType.DIGITAL_INPUT;
                     break;
-
                 case "IN_REG":
                     registryType = PointType.ANALOG_INPUT;
                     break;
-
                 case "HR_INT":
                     registryType = PointType.ANALOG_OUTPUT;
                     break;
-
                 default:
                     registryType = PointType.HR_LONG;
                     break;
