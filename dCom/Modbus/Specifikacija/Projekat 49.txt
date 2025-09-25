@@ -1,0 +1,66 @@
+
+Eksterna baterija za punjenje električnih uredjaja,koja ima svoj kapacitet (K).
+Baterija poseduje 4 izlaza, 3 USB-a I utičnicu. Takođe ima jedan ulaz kako bi se ona punila.
+Ukoliko je je neki od USB-a izlaza iskorišćen (T1,T2,T3) tačnije neki uređaj se puni, baterija svaki sekund
+gubi 1% kapaciteta.
+Ukoliko je utičnica isorišćena (T4) tačnije neki uređaj se puni, baterija svaki sekund gubi 3% kapaciteta.
+Ukoliko je baterija uključena u struju, napaja se u zavisnosti od napajanja različitom brzinom.
+Napajanje (I1) bateriju puni 2% u sekundi.
+Napajanje (I2) bateriju puni 3% u sekundi.
+Napomena: Podrazumevati da napajanja I1 i I2 neće biti istovremeno uključena.
+
+RTU slave adresa je 10.
+Koristi se TCP transportni protokol i port 25252.
+Definisati izlaze prema tabeli veličina.
+
+Veličina - Tip - Adresa - Opis
+T1 - Digitalni izlaz - 1000 - Stanje USB1 (ON/OFF)
+T2 - Digitalni izlaz - 1001 - Stanje USB1 (ON/OFF)
+T3 - Digitalni izlaz - 1002 - Stanje USB1 (ON/OFF)
+T4 - Digitalni izlaz - 1003 - Stanje uticnice (ON/OFF)
+K - Analogni izlaz - 2000 - Kapacitet baterije
+I1 - Digitalni izlaz - 3000 - Stanje prvog napajanja (ON/OFF)
+I2 - Digitalni izlaz - 3001 - Stanje drugog napajanja (ON/OFF)
+
+Zadatak:
+​
+
+Proširiti konfiguracionu datoteku RtuCfg.txt sa sledećim parametrima:
+●​ A – faktor skaliranja (celobrojna vrednost, podrazumevana vrednost treba da bude 1)
+●​ B – odstupanje (celobrojna vrednost, podrazumevana vrednost treba da bude 0)
+●​ LowAlarm – viša granična vrednost analogne veličine u inženjerskim jedinicama (celobrojna vrednost,
+podrazumevana vrednost treba da bude 20)
+●​ EguMax – Maksimalan kapacitet baterije (podrazumevana vrednost 100)
+●​ AbnormalValue – označava abnormalno stanje za digitalne veličine (podrazumevana vrednost treba da
+suprotna od normalnog stanja).
+●​ Normalno stanje USB izlaza T1-T3, utičnice T4 i napajanja I2 je OFF
+●​ Normalno stanje napajanja I1 je ON
+
+Eliminacioni:
+Podesiti komunikacione parametre u dCom aplikaciji i u simulatoru tako da TCP veza može da se ostvari.
+Pravilno konfigurisati datoteku “RtuCfg.txt” u skladu sa zadatim veličinama u sistemu i njihovim vrednostima.
+●​ Prema definisanoj konfiguraciji periodično očitavati sve digitalne izlaze (coils) i osvežavati vrednosti na
+korisničkom interfejsu.
+●​ Prema definisanoj konfiguraciji periodično očitavati sve analogne izlaze (holding registers) i osvežavati
+vrednosti na korisničkom interfejsu.
+●​ Omogućiti komandovanje kroz kontrolni prozor za sve definisane digitalne izlaze (coils) i nakon uspešnog
+upisa osvežavati vrednosti na korisničkom interfejsu.
+●​ Omogućiti komandovanje kroz kontrolni prozor za sve definisane analogne izlaze (holding registers) i
+nakon uspešnog upisa osvežavati vrednosti na korisničkom interfejsu.
+●​ Na sve izlazne analogne veličine primenjivati konverziju u inženjerske jedinice koristeći formulu:
+EGU_value = A * raw_value + B
+●​ Prilikom izdavanja komandi na izlazne analogne veličine konvertovati inženjerske jedinice u sirove
+vrednosti koristeći parametre A i B.
+●​ Korisnik može ručno (daljinski) da uključuje uređaje na punjenje (T1-T4) samo ako je kapacitet baterije
+veći od vrednosti LowAlarm.
+●​ Ukoliko K (Kapacitet baterije) padne ispod LowAlarm vrednosti, prijaviti LowAlarm i isključiti I4 (utičnica)
+pošto ona troši najviše struje i uključiti napajanje I2 jer će ono brže napuniti bateriju.
+●​ Ukoliko K (Kapacitet baterije) dostigne EguMax vrednost, iskljčiti napajanje koje ga je do tad punilo (I1 ili
+I2).
+●​ Simulirati punjenje/pražnjenje baterije u zavisnosti od uključenih uređaja i napajanja.
+Napomene:
+●​ Izvorni kod dCom aplikacije (uključujući i odgovarajuću RtuCfg.txt konfiguracionu datoteku) snimiti u
+folder sa nazivom
+[OznakaIndeksa_Ime_Prezime] koji treba napraviti na putanji C:\Temp\
+●​ Kod koji se ne kompajlira se neće bodovati
+●​ Ukupan broj osvojenih bodova predstavlja zbir kompletno završenih stavki iz teksta zadatka
