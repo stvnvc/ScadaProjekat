@@ -1,5 +1,6 @@
 ﻿using Common;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 
 namespace ProcessingModule
@@ -56,7 +57,21 @@ namespace ProcessingModule
         /// </summary>
 		private void Acquisition_DoWork()
 		{
-            //TO DO: IMPLEMENT
+            List<IConfigItem> configItems = configuration.GetConfigurationItems();
+            while(true)
+            {
+                acquisitionTrigger.WaitOne();
+                foreach( var i in configItems)
+                {
+                    i.SecondsPassedSinceLastPoll += 1;
+                    if(i.SecondsPassedSinceLastPoll == i.AcquisitionInterval) //ovo nam bas ni ne treba jer sve cita na 1 sekundu
+                    {
+                        processingManager.ExecuteReadCommand(i, this.configuration.GetTransactionId(), this.configuration.UnitAddress, i.StartAddress, i.NumberOfRegisters);
+                    
+                        i.SecondsPassedSinceLastPoll = 0; 
+                    }
+                }
+            }
         }
 
         #endregion Private Methods
